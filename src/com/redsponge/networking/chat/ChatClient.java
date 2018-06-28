@@ -1,27 +1,10 @@
 package com.redsponge.networking.chat;
 
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JTextArea;
-import javax.swing.WindowConstants;
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Container;
-import java.awt.Dimension;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.PrintWriter;
+import javax.swing.*;
+import javax.swing.text.Document;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
 import java.net.Socket;
 import java.util.List;
 import java.util.ListIterator;
@@ -32,21 +15,31 @@ public class ChatClient {
     private Thread receiver;
     private JFrame frame;
     private JButton sendbutton;
-    private JTextArea inputBox;
+    private JTextField inputBox;
     private JTextArea chat;
     private String username;
     private JTextArea onlineUsers;
 
+    private JCheckBox autoscroll;
+
+    private String ip;
+    private int port;
+
+    private boolean connected;
+
     private PrintWriter out;
 
     public ChatClient() {
+        ip = Shared.ip;
+        port = Shared.port;
         setupGui();
         connect();
     }
 
     public void connect() {
         try {
-            s = new Socket(Shared.ip, Shared.port);
+            s = new Socket(ip, port);
+            connected = true;
             out = new PrintWriter(s.getOutputStream(), true);
             receiver = new Thread(this::receive);
             receiver.start();
@@ -59,21 +52,23 @@ public class ChatClient {
         frame = new JFrame("Chat App");
         frame.setSize(500, 500);
         frame.setLocationRelativeTo(null);
-        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        frame.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                if(connected) {
+                    send("QUIT");
+                }
+            }
+        });
 
         sendbutton = new JButton("Send!");
 
-        inputBox = new JTextArea("Type Here!");
+        inputBox = new JTextField("Type Here!");
+        inputBox.addActionListener(this::actionPerformed);
         //inputBox.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
-        sendbutton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                System.out.println("ACTION");
-                send(inputBox.getText());
-                inputBox.setText("");
-            }
-        });
+        sendbutton.addActionListener(this::actionPerformed);
 
 
         frame.setLayout(new BorderLayout());
@@ -85,7 +80,9 @@ public class ChatClient {
 
         chat = new JTextArea();
         chat.setEditable(false);
-
+        chat.setAutoscrolls(true);
+        JScrollPane chatScroller = new JScrollPane(chat);
+        chatScroller.setAutoscrolls(true);
         onlineUsers = new JTextArea();
         onlineUsers.setEditable(false);
 
@@ -95,7 +92,7 @@ public class ChatClient {
         c.weightx = 3;
         c.weighty = 1.0;
         c.fill = GridBagConstraints.BOTH;
-        chatPanel.add(chat, c);
+        chatPanel.add(chatScroller, c);
         c.weightx = 1;
         chatPanel.add(onlineUsers, c);
 
@@ -111,6 +108,28 @@ public class ChatClient {
         con.add(send, BorderLayout.SOUTH);
 
         username = JOptionPane.showInputDialog(frame, "Username: ");
+        if(username == null || username.trim().equals("")) {
+            System.exit(-1);
+        }
+
+        JPanel userData = new JPanel(new GridLayout());
+        userData.setBackground(new Color(0, 0, 0, 0));
+        userData.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(Color.BLACK), "User Data"));
+
+
+        String[][] labels = {
+            {"USERNAME:", username},
+            {"IP:", ip},
+            {"PORT:", Integer.toString(port)}
+        };
+        for(String[] entry : labels) {
+            JTextArea label = new JTextArea(entry[1]);
+            label.setEditable(false);
+            label.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(Color.BLACK), entry[0]));
+            userData.add(label);
+        }
+
+        con.add(userData, BorderLayout.NORTH);
         frame.setVisible(true);
     }
 
@@ -119,27 +138,38 @@ public class ChatClient {
         out.println(message);
     }
 
+    public void processMessage(String message){
+        if(message.startsWith(Shared.command_prefix)) {
+            send("QUIT");
+        } else if(!message.trim().equals("")){
+            send(Shared.message_prefix + message);
+        }
+    }
+
     public void receive() {
         try {
             BufferedReader br = new BufferedReader(new InputStreamReader(s.getInputStream()));
-            while(!s.isClosed()) {
+            boolean running = true;
+            while(running) {
                 String data = br.readLine();
                 System.out.println(data);
                 if(data.startsWith(Shared.message_prefix)) {
                     data = data.substring(Shared.message_prefix.length());
                     printIntoChat(data);
                 }
-                if(data.equals("USERNAME")) {
+                else if(data.equals("USERNAME")) {
                     System.out.println("USERNAME: " + username);
                     send(username);
                 }
-                if(data.equals("QUIT")) {
-                    s.close();
-                } if(data.equals(Shared.user_update)) {
+                else if(data.equals("QUIT")) {
+                    running = false;
+                }
+                else if(data.equals(Shared.user_update)) {
                     updateUserList(br);
                 }
             }
             System.out.println("Stopped listening to server! joining thread");
+            System.exit(0);
             receiver.join();
         } catch (IOException e) {
             e.printStackTrace();
@@ -148,19 +178,23 @@ public class ChatClient {
         } finally {
             System.out.println("Fully disconnected!");
         }
-        System.exit(0);
     }
 
     private void updateUserList(BufferedReader in) {
-        onlineUsers.setText("");
         String[] users = getOnlineUsers(in);
-        onlineUsers.setText(String.join("\n", users));
+        StringBuilder sb = new StringBuilder();
+        for(String user : users) {
+            sb.append("* ");
+            sb.append(user);
+            sb.append("\n");
+        }
+        onlineUsers.setText(sb.toString());
     }
 
     public String[] getOnlineUsers(BufferedReader in) {
         String s = request(Shared.online_user_request, in);
-        ;System.out.println("GOT ONLINE USERS: " + s);
-        return s.split("\n");
+        System.out.println("GOT ONLINE USERS: " + s);
+        return s.split(Shared.ARRAY_JOIN_DELIMETER);
     }
 
     public String request(String data, BufferedReader in) {
@@ -174,18 +208,19 @@ public class ChatClient {
     }
 
     public void disconnect() {
-        try {
-            s.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        send("QUIT");
     }
 
     public void printIntoChat(String s) {
-        chat.append(s + "\n");
+        chat.append(s + '\n');
     }
 
     public static void main(String[] args) {
         new ChatClient();
+    }
+
+    private void actionPerformed(ActionEvent e) {
+        processMessage(inputBox.getText());
+        inputBox.setText("");
     }
 }

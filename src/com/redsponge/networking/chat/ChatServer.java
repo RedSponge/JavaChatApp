@@ -58,45 +58,47 @@ public class ChatServer {
         //TODO HANDLE
         System.out.println("ID: " + id);
         Thread thread = socketThreads.get(id);
+        boolean running = true;
+        String username = "";
         try {
             PrintWriter out = new PrintWriter(s.getOutputStream(), true);
             BufferedReader in = new BufferedReader(new InputStreamReader(s.getInputStream()));
-            String username = receive("USERNAME", out, in);
+            username = receive("USERNAME", out, in);
             System.out.println(username);
             connectedUsers.add(username);
             broadcast(Shared.user_update);
 
-            while(!s.isClosed()) {
+            while(running) {
                 String data = in.readLine();
                 System.out.println("Got data " + data + " from socket " + s);
                 if(data.startsWith(Shared.message_prefix))
-                broadcast(Shared.message_prefix + "[" + username + "] " + data);
+                broadcast(Shared.message_prefix + "[" + username + "] " + data.substring(Shared.message_prefix.length()));
                 if(data.equals("QUIT")) {
                     out.println("QUIT");
-                    s.close();
+                    running = false;
                 }
                 if(data.equals(Shared.online_user_request)) {
-                    System.out.println(String.join(",", connectedUsers));
-                    out.println(String.join(",", connectedUsers));
+                    out.println(String.join(Shared.ARRAY_JOIN_DELIMETER, connectedUsers));
                 }
             }
 
             System.out.println("Stopping handling for socket with id " + id);
-            connectedUsers.remove(username);
-            broadcast(Shared.user_update);
             socketThreads.remove(thread);
-            thread.join();
 
         } catch (IOException e) {
-            if(e instanceof SocketException) System.out.println("Connection end!");
+            if (e instanceof SocketException) System.out.println("Connection end!");
             else e.printStackTrace();
-        } catch(InterruptedException e) {
-            throw new RuntimeException("Couldn't join thread for socket with id " + id, e);
         } finally {
             System.out.println("Finished handling socket with id " + id + "!");
+            connectedUsers.remove(username);
+            broadcast(Shared.user_update);
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
-
 
     public String receive(String data, PrintWriter out, BufferedReader in) {
         try {
