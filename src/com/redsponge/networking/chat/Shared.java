@@ -16,4 +16,8 @@ public class Shared {
 
     public static final String ARRAY_JOIN_DELIMETER = "~";
 
+    public static final String JOIN_PREFIX = "userjoin";
+
+    public static final String LEAVE_PREFIX = "userleave";
+
 }

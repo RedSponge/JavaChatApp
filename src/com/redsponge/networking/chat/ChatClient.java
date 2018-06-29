@@ -52,7 +52,7 @@ public class ChatClient {
             @Override
             public void windowClosing(WindowEvent e) {
                 if(connected) {
-                    send("QUIT");
+                    disconnect();
                 }
             }
         });
@@ -135,7 +135,7 @@ public class ChatClient {
 
     public void processMessage(String message){
         if(message.startsWith(Shared.command_prefix)) {
-            send("QUIT");
+            disconnect();
         } else if(!message.trim().equals("")){
             send(Shared.message_prefix + message);
         }
@@ -166,13 +166,17 @@ public class ChatClient {
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
+            try {
+                s.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             System.out.println("Fully disconnected!");
         }
         System.exit(0);
     }
 
     private void updateUserList(BufferedReader in) {
-        onlineUsers.setText("HIIIIIIIIII");
         String[] users = getOnlineUsers(in);
         System.out.println("ONLINE USERS HERE");
         StringBuilder sb = new StringBuilder();
@@ -183,7 +187,9 @@ public class ChatClient {
         }
         System.out.println("BUILT STRING");
         String s = sb.toString();
-        onlineUsers.append(Integer.toString(s.length()));
+        SwingUtilities.invokeLater(
+                () -> {onlineUsers.setText("");onlineUsers.append(s);}
+        );
 
         System.out.println("DONE");
     }
@@ -209,7 +215,9 @@ public class ChatClient {
     }
 
     public void printIntoChat(String s) {
-        chat.append(s + '\n');
+        SwingUtilities.invokeLater(
+            () -> chat.append(s + '\n')
+        );
     }
 
     public static void main(String[] args) {

@@ -1,15 +1,8 @@
 package com.redsponge.networking.chat;
 
-import javafx.util.Builder;
-
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutput;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -41,6 +34,7 @@ public class ChatServer {
     public void listen() {
         boolean listening = true;
         try {
+            System.out.println("Listening for clients!");
             while(listening) {
                 Socket s = server.accept();
                 int id = socketThreads.size();
@@ -67,6 +61,7 @@ public class ChatServer {
             System.out.println(username);
             connectedUsers.add(username);
             broadcast(Shared.user_update);
+            broadcastExclude(Shared.JOIN_PREFIX + username, s);
 
             while(running) {
                 String data = in.readLine();
@@ -82,6 +77,7 @@ public class ChatServer {
                 }
             }
 
+            broadcastExclude(Shared.LEAVE_PREFIX + username, s);
             System.out.println("Stopping handling for socket with id " + id);
             socketThreads.remove(thread);
 
@@ -93,8 +89,9 @@ public class ChatServer {
             connectedUsers.remove(username);
             broadcast(Shared.user_update);
             try {
+                s.close();
                 thread.join();
-            } catch (InterruptedException e) {
+            } catch (InterruptedException | IOException e) {
                 e.printStackTrace();
             }
         }
