@@ -12,16 +12,12 @@ import java.util.ListIterator;
 public class ChatClient {
 
     private Socket s;
-    private Thread receiver;
     private JFrame frame;
     private JButton sendbutton;
     private JTextField inputBox;
     private JTextArea chat;
     private String username;
     private JTextArea onlineUsers;
-
-    private JCheckBox autoscroll;
-
     private String ip;
     private int port;
 
@@ -41,8 +37,7 @@ public class ChatClient {
             s = new Socket(ip, port);
             connected = true;
             out = new PrintWriter(s.getOutputStream(), true);
-            receiver = new Thread(this::receive);
-            receiver.start();
+            receive();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -52,7 +47,7 @@ public class ChatClient {
         frame = new JFrame("Chat App");
         frame.setSize(500, 500);
         frame.setLocationRelativeTo(null);
-        frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
@@ -168,27 +163,29 @@ public class ChatClient {
                     updateUserList(br);
                 }
             }
-            System.out.println("Stopped listening to server! joining thread");
-            System.exit(0);
-            receiver.join();
         } catch (IOException e) {
             e.printStackTrace();
-        } catch (InterruptedException e) {
-            throw new RuntimeException("Couldn't join thread!", e);
         } finally {
             System.out.println("Fully disconnected!");
         }
+        System.exit(0);
     }
 
     private void updateUserList(BufferedReader in) {
+        onlineUsers.setText("HIIIIIIIIII");
         String[] users = getOnlineUsers(in);
+        System.out.println("ONLINE USERS HERE");
         StringBuilder sb = new StringBuilder();
         for(String user : users) {
             sb.append("* ");
             sb.append(user);
             sb.append("\n");
         }
-        onlineUsers.setText(sb.toString());
+        System.out.println("BUILT STRING");
+        String s = sb.toString();
+        onlineUsers.append(Integer.toString(s.length()));
+
+        System.out.println("DONE");
     }
 
     public String[] getOnlineUsers(BufferedReader in) {
