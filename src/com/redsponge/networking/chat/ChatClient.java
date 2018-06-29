@@ -5,7 +5,9 @@ import javax.swing.text.Document;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
+import java.net.ConnectException;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.List;
 import java.util.ListIterator;
 
@@ -39,6 +41,17 @@ public class ChatClient {
             out = new PrintWriter(s.getOutputStream(), true);
             receive();
         } catch (IOException e) {
+            if(e instanceof ConnectException) {
+                printIntoChat("########[Couldn't connect!]########");
+                printIntoChat(e.getMessage());
+
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException ex) {
+                    ex.printStackTrace();
+                }
+                System.exit(-2);
+            } else
             e.printStackTrace();
         }
     }
@@ -163,7 +176,16 @@ public class ChatClient {
                     updateUserList(br);
                 }
             }
-        } catch (IOException e) {
+        } catch(SocketException e) {
+            printIntoChat("########[Server Closed!]########");
+            printIntoChat(e.getMessage());
+
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ex) {
+                ex.printStackTrace();
+            }
+        } catch(IOException e) {
             e.printStackTrace();
         } finally {
             try {

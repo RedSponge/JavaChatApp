@@ -1,9 +1,8 @@
 package com.redsponge.networking.chat;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import javax.swing.*;
+import java.awt.*;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -19,16 +18,35 @@ public class ChatServer {
     private List<Socket> sockets;
     private List<String> connectedUsers;
 
-    public ChatServer(String ip, int port) {
+    public ChatServer(String ip, int port, boolean gui) {
         socketThreads = new ArrayList<>();
         sockets = new ArrayList<>();
         connectedUsers = new ArrayList<>();
+        if(gui) createGui();
         try {
             server = new ServerSocket(port, Shared.server_backlog, InetAddress.getByName(ip));
             listen();
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public void createGui() {
+        JFrame frame = new JFrame("Chat App - Server");
+
+        frame.setMinimumSize(new Dimension(500, 250));
+        JTextArea console = new JTextArea();
+        console.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(Color.BLACK), "Console"));
+        console.setEditable(false);
+        PrintStream out = new PrintStream(new TextAreaOutputStream(console));
+
+        System.setOut(out);
+        System.setErr(out);
+
+        frame.getContentPane().add(console);
+
+        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        frame.setVisible(true);
     }
 
     public void listen() {
@@ -133,6 +151,12 @@ public class ChatServer {
     }
 
     public static void main(String[] args) {
-        new ChatServer(Shared.ip, Shared.port);
+        boolean gui = false;
+        if(args.length > 0) {
+            if(args[0].equals("gui")) {
+                gui = true;
+            }
+        }
+        new ChatServer(Shared.ip, Shared.port, gui);
     }
 }
