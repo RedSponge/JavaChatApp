@@ -14,8 +14,10 @@ public class TextAreaOutputStream extends OutputStream {
 
     @Override
     public void write(int b) {
-        area.append(String.valueOf((char)b));
-        area.setCaretPosition(area.getDocument().getLength());
+        SwingUtilities.invokeLater(() -> {
+            area.append(String.valueOf((char) b));
+            area.setCaretPosition(area.getDocument().getLength());
+        });
     }
 
 }

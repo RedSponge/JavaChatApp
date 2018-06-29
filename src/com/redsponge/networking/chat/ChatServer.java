@@ -3,10 +3,7 @@ package com.redsponge.networking.chat;
 import javax.swing.*;
 import java.awt.*;
 import java.io.*;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketException;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -18,32 +15,54 @@ public class ChatServer {
     private List<Socket> sockets;
     private List<String> connectedUsers;
 
+    public ChatServer(int port, boolean gui) throws UnknownHostException {
+        this(InetAddress.getLocalHost().getHostAddress(), port, gui);
+    }
+
     public ChatServer(String ip, int port, boolean gui) {
         socketThreads = new ArrayList<>();
         sockets = new ArrayList<>();
         connectedUsers = new ArrayList<>();
-        if(gui) createGui();
+        if(gui) createGui(ip, port);
         try {
             server = new ServerSocket(port, Shared.server_backlog, InetAddress.getByName(ip));
+            System.out.println("Running on " + ip + ":" + port);
             listen();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public void createGui() {
+    public void createGui(String ip, int port) {
         JFrame frame = new JFrame("Chat App - Server");
-
         frame.setMinimumSize(new Dimension(500, 250));
+
         JTextArea console = new JTextArea();
         console.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(Color.BLACK), "Console"));
         console.setEditable(false);
+        console.setLineWrap(true);
         PrintStream out = new PrintStream(new TextAreaOutputStream(console));
 
         System.setOut(out);
         System.setErr(out);
 
-        frame.getContentPane().add(console);
+        JScrollPane consoleScroller = new JScrollPane(console);
+
+        JPanel info = new JPanel(new GridLayout());
+        String[][] labels = {
+                {"IP:", ip},
+                {"PORT:", Integer.toString(port)}
+        };
+        for(String[] entry : labels) {
+            JTextArea label = new JTextArea(entry[1]);
+            label.setEditable(false);
+            label.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(Color.BLACK), entry[0]));
+            info.add(label);
+        }
+
+        Container c = frame.getContentPane();
+        c.add(info, BorderLayout.NORTH);
+        c.add(consoleScroller, BorderLayout.CENTER);
 
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.setVisible(true);
@@ -67,7 +86,6 @@ public class ChatServer {
     }
 
     public void handleSocket(int id, Socket s) {
-        //TODO HANDLE
         System.out.println("ID: " + id);
         Thread thread = socketThreads.get(id);
         boolean running = true;
@@ -107,9 +125,8 @@ public class ChatServer {
             connectedUsers.remove(username);
             broadcast(Shared.user_update);
             try {
-                s.close();
                 thread.join();
-            } catch (InterruptedException | IOException e) {
+            } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
@@ -151,12 +168,16 @@ public class ChatServer {
     }
 
     public static void main(String[] args) {
-        boolean gui = false;
+        boolean gui = true;
         if(args.length > 0) {
-            if(args[0].equals("gui")) {
-                gui = true;
+            if(args[0].equals("nogui")) {
+                gui = false;
             }
         }
-        new ChatServer(Shared.ip, Shared.port, gui);
+        try {
+            new ChatServer(Shared.port, gui);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

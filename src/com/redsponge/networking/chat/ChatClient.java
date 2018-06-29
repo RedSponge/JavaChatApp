@@ -5,9 +5,7 @@ import javax.swing.text.Document;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
-import java.net.ConnectException;
-import java.net.Socket;
-import java.net.SocketException;
+import java.net.*;
 import java.util.List;
 import java.util.ListIterator;
 
@@ -28,7 +26,7 @@ public class ChatClient {
     private PrintWriter out;
 
     public ChatClient() {
-        ip = Shared.ip;
+        ip = JOptionPane.showInputDialog("IP: ");
         port = Shared.port;
         setupGui();
         connect();
@@ -41,18 +39,8 @@ public class ChatClient {
             out = new PrintWriter(s.getOutputStream(), true);
             receive();
         } catch (IOException e) {
-            if(e instanceof ConnectException) {
-                printIntoChat("########[Couldn't connect!]########");
-                printIntoChat(e.getMessage());
-
-                try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException ex) {
-                    ex.printStackTrace();
-                }
-                System.exit(-2);
-            } else
-            e.printStackTrace();
+            printIntoChat("########[Couldn't connect!]########");
+            printIntoChat("ERROR: " + e.toString());
         }
     }
 
@@ -61,14 +49,24 @@ public class ChatClient {
         frame.setSize(500, 500);
         frame.setLocationRelativeTo(null);
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-        frame.addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent e) {
-                if(connected) {
-                    disconnect();
+        frame.addWindowListener(
+                new WindowAdapter() {
+                    @Override
+                    public synchronized void windowClosing(WindowEvent e) {
+                        if (connected) {
+                            disconnect();
+                            while (connected) {
+                                try {
+                                    Thread.sleep(0);
+                                } catch (InterruptedException ex) {
+                                    ex.printStackTrace();
+                                }
+                            }
+                        }
+                        System.exit(0);
+                    }
                 }
-            }
-        });
+            );
 
         sendbutton = new JButton("Send!");
 
@@ -89,6 +87,7 @@ public class ChatClient {
         chat = new JTextArea();
         chat.setEditable(false);
         chat.setAutoscrolls(true);
+        chat.setLineWrap(true);
         JScrollPane chatScroller = new JScrollPane(chat);
         chatScroller.setAutoscrolls(true);
         onlineUsers = new JTextArea();
@@ -138,6 +137,11 @@ public class ChatClient {
         }
 
         con.add(userData, BorderLayout.NORTH);
+
+        Font font = new Font("Arial", Font.PLAIN, 12);
+        Font bold = new Font("Arial", Font.BOLD, 12);
+
+        changeFont(frame, font);
         frame.setVisible(true);
     }
 
@@ -179,23 +183,13 @@ public class ChatClient {
         } catch(SocketException e) {
             printIntoChat("########[Server Closed!]########");
             printIntoChat(e.getMessage());
-
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException ex) {
-                ex.printStackTrace();
-            }
         } catch(IOException e) {
             e.printStackTrace();
         } finally {
-            try {
-                s.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            connected = false;
             System.out.println("Fully disconnected!");
+            printIntoChat("You can now safely exit the application");
         }
-        System.exit(0);
     }
 
     private void updateUserList(BufferedReader in) {
@@ -233,7 +227,8 @@ public class ChatClient {
     }
 
     public void disconnect() {
-        send("QUIT");
+        if(connected)
+            send("QUIT");
     }
 
     public void printIntoChat(String s) {
@@ -249,5 +244,17 @@ public class ChatClient {
     private void actionPerformed(ActionEvent e) {
         processMessage(inputBox.getText());
         inputBox.setText("");
+    }
+
+    public static void changeFont ( Component component, Font font )
+    {
+        component.setFont ( font );
+        if ( component instanceof Container )
+        {
+            for ( Component child : ( ( Container ) component ).getComponents () )
+            {
+                changeFont ( child, font );
+            }
+        }
     }
 }
